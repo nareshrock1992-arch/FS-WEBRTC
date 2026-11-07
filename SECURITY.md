@@ -35,7 +35,7 @@ FS-WebRTC is a **LAN lab proof of concept**. It is not production-secure, and WS
 ## Dependencies
 
 - All versions pinned exactly (`save-exact`), with a committed lockfile.
-- `npm audit` (2026-11-07): **0 vulnerabilities in runtime dependencies** (`sip.js`). 10 moderate findings in dev-only lint tooling (`minimatch` ReDoS via eslint/typescript-eslint). These are not shipped to browsers and are only reachable with attacker-controlled glob patterns at lint time, so they're accepted for the lab and re-checked on every upgrade.
+- `npm audit` (2026-11-07): **0 vulnerabilities in runtime dependencies** (`sip.js` in the browser, `ws` in the server proxy). 10 moderate findings in dev-only lint tooling (`minimatch` ReDoS via eslint/typescript-eslint). These are not shipped to browsers and are only reachable with attacker-controlled glob patterns at lint time, so they're accepted for the lab and re-checked on every upgrade.
 
 ## Pre-existing server issues (outside this project, reported in M0)
 

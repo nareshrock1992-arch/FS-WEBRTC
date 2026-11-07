@@ -29,6 +29,10 @@
 
 FreeSWITCH reads its WSS certificate only from `wss.pem`. The existing one has no SAN and isn't trusted, and the brief forbids overwriting it. Option A puts TLS on the FS-WebRTC server, which presents a trusted mkcert certificate, and relays to the existing plain WS listener on the same machine. Result: **zero FreeSWITCH configuration changes and no profile restart.** Option B (`tls-cert-dir` on the internal profile) remains a possible later learning step, with approval.
 
+### Lesson learned: Via transport rewrite (verified 2026-11-07)
+
+SIP.js writes `Via: SIP/2.0/WSS …` because the browser uses `wss://`. FreeSWITCH's SIP stack **silently discards** requests whose Via says WSS when they arrive on its plain `ws` listener. A byte-for-byte proxy therefore never gets a reply to REGISTER. `server/server.mjs` relays individual WebSocket messages and `server/sip-via.mjs` rewrites only the Via transport token: `WSS→WS` towards FreeSWITCH, and `WS→WSS` back on the browser's own `*.invalid` Via in replies. SDP bodies are never touched.
+
 ## Call flows
 
 **Registration:** browser → `REGISTER` over WSS → proxy → FreeSWITCH replies `401` (digest challenge) → SIP.js re-sends with Authorization → `200 OK`. SIP.js refreshes it before the 300 s expiry.

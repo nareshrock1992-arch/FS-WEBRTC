@@ -14,6 +14,17 @@
 | A-08 | Server: real WS handshake through proxy to FreeSWITCH :5066 → 101 `sip`                  | same                       | PASS (no REGISTER sent)       |
 | A-09 | Runtime dependency audit                                                                 | `npm audit --omit=dev`     | PASS – 0 vulnerabilities      |
 
+## M2 server verification (executed 2026-11-07)
+
+| ID   | Test                                                                                  | Result                                                                    |
+| ---- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| S-01 | Smoke test against `https://192.168.1.133:8443` with TLS verified via the mkcert root | PASS 8/8                                                                  |
+| S-02 | Headless SIP.js REGISTER 7990001 via `wss://…:8443/sip` (byte-pipe proxy)             | **FAIL**: no reply. Root cause: Via WSS dropped by FreeSWITCH WS listener |
+| S-03 | Same REGISTER, direct `ws://…:5066` (diagnostic)                                      | PASS 200 OK, confirms the root cause                                      |
+| S-04 | REGISTER through the fixed message-aware proxy, correct password                      | PASS 200 OK, then un-REGISTER                                             |
+| S-05 | REGISTER through the fixed proxy, wrong password                                      | PASS 403 Forbidden                                                        |
+| S-06 | FreeSWITCH health after changes                                                       | PASS: 4 profiles RUNNING, 1001 registered, 0 channels                     |
+
 **Not yet tested** (needs M2 server setup and real browsers): everything below. **Nothing below has been claimed as working.**
 
 ## Manual browser tests (M2/M3) – template

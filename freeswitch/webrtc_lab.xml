@@ -1,7 +1,9 @@
 <!--
   FS-WebRTC isolated lab dialplan context (M2 – FREESWITCH CHANGE, APPROVAL REQUIRED).
   Install as: /opt/freeswitch/etc/freeswitch/dialplan/webrtc_lab.xml
-  (picked up by the existing  <X-PRE-PROCESS cmd="include" data="dialplan/*.xml"/>)
+  (picked up by the existing dialplan/*.xml include in freeswitch.xml)
+  WARNING: never quote a pre-process directive inside a comment in FreeSWITCH XML –
+  the preprocessor executes it even inside comments.
 
   Lab users (user_context=webrtc_lab) can ONLY:
     - call each other (7990001 / 7990002)

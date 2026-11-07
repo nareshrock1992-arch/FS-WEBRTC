@@ -8,7 +8,11 @@
  *     so the unencrypted hop never leaves the server and no FreeSWITCH setting or certificate
  *     has to change.
  *
- * Node.js built-ins only (no runtime dependencies). Configuration via environment variables:
+ *  The relay is WebSocket-message aware (library "ws"): FreeSWITCH drops SIP requests whose
+ *  Via says WSS when they arrive on its plain WS listener, so Via transports are rewritten
+ *  per message (see sip-via.mjs). Message bodies (SDP) are never modified.
+ *
+ * Configuration via environment variables:
  *   FSW_BIND               address to listen on              (default 127.0.0.1)
  *   FSW_PORT               HTTPS port                        (default 8443)
  *   FSW_TLS_CERT           path to certificate PEM           (required)
@@ -19,9 +23,10 @@
  */
 import { createReadStream, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:https';
-import { connect } from 'node:net';
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { WebSocket, WebSocketServer } from 'ws';
+import { toBrowser, toFreeSwitch } from './sip-via.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cfg = {
@@ -121,6 +126,15 @@ function serveStatic(req, res) {
 // ------------------------------------------------------------------ WSS -> WS proxy
 
 let wsCount = 0;
+const MAX_SIP_MESSAGE = 256 * 1024;
+
+// noServer: the HTTPS server's 'upgrade' event decides (path, Origin, sub-protocol, limits).
+const wss = new WebSocketServer({
+  noServer: true,
+  perMessageDeflate: false,
+  maxPayload: MAX_SIP_MESSAGE,
+  handleProtocols: (protocols) => (protocols.has('sip') ? 'sip' : false),
+});
 
 function reject(socket, status, text) {
   socket.end(`HTTP/1.1 ${status} ${text}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
@@ -145,51 +159,70 @@ function proxyWebSocket(req, clientSocket, head) {
   }
   if (wsCount >= cfg.maxWs) return reject(clientSocket, 503, 'Service Unavailable');
 
-  const upstream = connect(Number(cfg.upstream.port || 80), cfg.upstream.hostname);
+  // Reserve a slot, then connect to FreeSWITCH first: the browser's handshake is only
+  // completed once the upstream is open, so a dead FreeSWITCH gives a clean 502.
   wsCount += 1;
-  logLine(`WS open peer=${peer} -> ${cfg.upstream.host} (active ${wsCount})`);
-
-  const forward = [
-    'upgrade',
-    'connection',
-    'sec-websocket-key',
-    'sec-websocket-version',
-    'sec-websocket-protocol',
-  ];
-  upstream.on('connect', () => {
-    const lines = [`GET ${cfg.upstream.pathname || '/'} HTTP/1.1`, `Host: ${cfg.upstream.host}`];
-    for (const name of forward) {
-      const value = req.headers[name];
-      if (value) lines.push(`${name}: ${value}`);
+  let released = false;
+  const release = () => {
+    if (!released) {
+      released = true;
+      wsCount -= 1;
     }
-    lines.push(`X-Forwarded-For: ${req.socket.remoteAddress}`);
-    upstream.write(lines.join('\r\n') + '\r\n\r\n');
-    if (head && head.length) upstream.write(head);
-    upstream.pipe(clientSocket);
-    clientSocket.pipe(upstream);
-  });
-
-  let closed = false;
-  const close = (why) => {
-    if (closed) return;
-    closed = true;
-    wsCount -= 1;
-    logLine(`WS close peer=${peer} (${why}) (active ${wsCount})`);
-    upstream.destroy();
-    clientSocket.destroy();
   };
-  upstream.on('error', (e) => {
-    if (!clientSocket.writableEnded && upstream.bytesRead === 0) {
-      reject(clientSocket, 502, 'Bad Gateway');
-    }
-    close(`upstream error ${e.code || e.message}`);
+
+  const upstream = new WebSocket(cfg.upstream.href, 'sip', {
+    perMessageDeflate: false,
+    handshakeTimeout: 5000,
+    maxPayload: MAX_SIP_MESSAGE,
+    headers: { 'X-Forwarded-For': String(req.socket.remoteAddress) },
   });
-  clientSocket.on('error', (e) => close(`client error ${e.code || e.message}`));
-  upstream.on('close', () => close('upstream closed'));
-  clientSocket.on('close', () => close('client closed'));
-  clientSocket.setNoDelay(true);
-  upstream.setNoDelay(true);
-  clientSocket.setKeepAlive(true, 30000);
+  let client;
+
+  const closeBoth = (why) => {
+    if (released) return;
+    release();
+    logLine(`WS close peer=${peer} (${why}) (active ${wsCount})`);
+    if (client && client.readyState <= WebSocket.OPEN) client.close(1001);
+    if (upstream.readyState <= WebSocket.OPEN) upstream.close(1001);
+  };
+
+  clientSocket.once('close', () => {
+    if (!client) {
+      release();
+      upstream.terminate();
+    }
+  });
+
+  upstream.once('error', (e) => {
+    if (!client) {
+      release();
+      logLine(`WS upstream unavailable peer=${peer}: ${e.code || e.message}`);
+      reject(clientSocket, 502, 'Bad Gateway');
+    } else {
+      closeBoth(`upstream error ${e.code || e.message}`);
+    }
+  });
+
+  upstream.once('open', () => {
+    wss.handleUpgrade(req, clientSocket, head, (ws) => {
+      client = ws;
+      logLine(`WS open peer=${peer} -> ${cfg.upstream.host} (active ${wsCount})`);
+
+      client.on('message', (data, isBinary) => {
+        if (upstream.readyState !== WebSocket.OPEN) return;
+        upstream.send(isBinary ? data : toFreeSwitch(data.toString('utf8')), { binary: isBinary });
+      });
+      upstream.on('message', (data, isBinary) => {
+        if (client.readyState !== WebSocket.OPEN) return;
+        client.send(isBinary ? data : toBrowser(data.toString('utf8')), { binary: isBinary });
+      });
+
+      client.on('close', () => closeBoth('client closed'));
+      upstream.on('close', () => closeBoth('upstream closed'));
+      client.on('error', (e) => closeBoth(`client error ${e.code || e.message}`));
+      upstream.on('error', (e) => closeBoth(`upstream error ${e.code || e.message}`));
+    });
+  });
 }
 
 // ------------------------------------------------------------------ start

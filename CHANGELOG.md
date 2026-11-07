@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.1] – 2026-11-07 – M2 deployment fixes
+
+### Fixed
+
+- **Proxy: REGISTER got no reply.** FreeSWITCH silently drops SIP requests whose `Via` transport is `WSS` when they arrive on its plain WS listener (verified: raw pipe gave no reply; the same REGISTER with `Via: SIP/2.0/WS` gave `200 OK`). The proxy is now WebSocket-message aware (`ws` 8.22.1) and rewrites only Via transports (`server/sip-via.mjs`); bodies/SDP are untouched.
+- `freeswitch/webrtc_lab.xml`: removed a quoted pre-process directive from an XML comment. FreeSWITCH executes those even inside comments, which caused a harmless `Error including dialplan/dialplan/*.xml` at reloadxml.
+
+### Added
+
+- `scripts/register-test.mjs`: headless SIP.js REGISTER check (password from the `SIP_PASSWORD` env var).
+- Unit tests for the Via rewrite (71 tests total).
+
 ## [0.1.0] – 2026-11-07 – M1 local implementation (not yet committed)
 
 ### Added

@@ -309,6 +309,12 @@ rm /opt/freeswitch/etc/freeswitch/directory/default/webrtc_lab_799000*.xml /opt/
 - The browser connects to `wss://192.168.1.133:8443/sip`. TLS uses the mkcert certificate (E-3).
 - The FS-WebRTC server passes each WebSocket to FreeSWITCH's **existing** `ws://192.168.1.133:5066`, inside the same machine.
 - FreeSWITCH settings and `wss.pem` are **unchanged**, and no profile restart is needed.
+- **Important (learned in M2):** FreeSWITCH silently ignores SIP requests whose `Via` says `WSS` when they arrive on its plain WS port. The proxy therefore rewrites the Via transport in each message (`server/sip-via.mjs`). A simple byte pipe does **not** work.
+- **Headless registration check** (`SAFE`, registers for a moment, then un-registers). Run in PowerShell; it asks for the password without echoing it:
+  ```bash
+  $env:NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)\rootCA.pem"; $env:SIP_PASSWORD=[Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR((Read-Host -AsSecureString "Lab password"))); node scripts/register-test.mjs wss://192.168.1.133:8443/sip 7990001 192.168.1.133; Remove-Item Env:SIP_PASSWORD
+  ```
+  **Expected:** `PASS REGISTER 7990001@192.168.1.133 -> 200 OK`. With a wrong password: `FAIL REGISTER rejected 403 Forbidden`.
 - Verified in M1: a real WebSocket handshake with sub-protocol `sip` through the proxy to FreeSWITCH returned `101 Switching Protocols`. Test it yourself with step M-2.
 
 ---
