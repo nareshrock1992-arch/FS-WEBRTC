@@ -33,6 +33,7 @@ npm run dev
 ```
 
 Full step-by-step instructions for non-developers are in **[IMPLEMENTATION_PROCEDURE_GUIDE.md](IMPLEMENTATION_PROCEDURE_GUIDE.md)**.
+**New to FreeSWITCH? Start with [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md)**: how the pieces fit together, every FreeSWITCH file involved, the journey of a call, and the problems we hit.
 
 ## Project layout
 

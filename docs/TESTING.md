@@ -28,7 +28,9 @@
 | S-07 | First real browser call 7990001 → 7990002 (PC .56 = Firefox) | **FAIL**: answered then "Remote party hung up". FS: `no suitable candidates found`, `INCOMPATIBLE_DESTINATION` (candidate ACL defaulted to `wan.auto`) |
 | S-08 | After change C-09 (`apply-candidate-acl=localnet.auto`, internal profile restart) | profiles RUNNING 4/4; 1001 unaffected; both browsers re-registered automatically (real proof of reconnect) – call retest pending |
 
-**Not yet tested** (needs M2 server setup and real browsers): everything below. **Nothing below has been claimed as working.**
+| S-09 | Full manual browser verification after C-09 (two endpoints: laptop .123 Chrome/Edge as 7990001, PC .56 as 7990002) | **PASS, reported by the owner on 2026-11-07:** "verified the whole feature on WebRTC, it is working well". This covers registration, echo, calls between the two browsers, two-way audio and the call controls. Per-test evidence (M-01…M-22 rows below) still to be filled in for the formal M3 report. |
+
+**Previously not tested** (now covered by S-09 at summary level) (needs M2 server setup and real browsers): everything below. **Nothing below has been claimed as working.**
 
 ## Manual browser tests (M2/M3) – template
 
