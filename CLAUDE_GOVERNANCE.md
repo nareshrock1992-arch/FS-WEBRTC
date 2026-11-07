@@ -31,7 +31,14 @@ These rules apply to **every** future session. If a request conflicts with them,
 11. **Deployment approval.**
 12. **Post-deployment verification** – health check, FreeSWITCH profiles RUNNING, existing registrations intact.
 
-## 3. Reporting rules
+## 3. Change record
+
+- Every server/FreeSWITCH change must be added to `docs/SERVER_CHANGE_REGISTER.md` (what, when, approval, verification, rollback) in the same session.
+- Every fix must be documented in `CHANGELOG.md`, the relevant `IMPLEMENTATION_PROCEDURE_GUIDE.md` part and `docs/TROUBLESHOOTING.md` (symptom → cause → fix).
+- Known approved exception: `sip_profiles/internal.xml` contains `apply-candidate-acl=localnet.auto` (C-09). Any further edit to existing FreeSWITCH files needs new explicit approval.
+- FreeSWITCH XML: never put `X-PRE-PROCESS` text in comments; it is executed anyway.
+
+## 4. Reporting rules
 
 - Distinguish verified facts from assumptions.
 - Report failures with the actual output.

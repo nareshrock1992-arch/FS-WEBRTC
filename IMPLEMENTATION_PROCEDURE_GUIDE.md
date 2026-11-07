@@ -91,7 +91,7 @@ Every command below uses these names. Another administrator must substitute thei
   ```
 - **Expected:** `## main` (or `## No commits yet on main`) followed by changed files.
 
-### B-3 Commit (only when approved) ⏳ `LOCAL CHANGE` `APPROVAL REQUIRED`
+### B-3 Commit (only when approved) ✅ `LOCAL CHANGE` `APPROVAL REQUIRED`
 
 - **Commands:** `git add -A`, then `git status` (check that no `.env`, `.pem` or `.key` files are listed), then `git commit -m "…"`.
 - **Rollback:** `git reset --soft HEAD~1` (keeps your files, undoes only the commit).
@@ -159,7 +159,7 @@ npm run dev
 
 **mkcert vs self-signed:** mkcert creates a private "root CA" on your PC. Once that root is trusted, every certificate it issues is trusted automatically. A self-signed certificate has to be imported manually on every client, and again after every renewal. **mkcert is simpler and more reliable for a LAN lab.**
 
-### E-1 Trust the mkcert root CA on Windows ⏳ `LOCAL CHANGE` `SECURITY-SENSITIVE` — **you run this yourself**
+### E-1 Trust the mkcert root CA on Windows ✅ `LOCAL CHANGE` `SECURITY-SENSITIVE` — **you run this yourself**
 
 - **What it does:** adds the mkcert root certificate to Windows' "Trusted Root Certification Authorities". Chrome and Edge then trust certificates issued by it. Windows shows a security warning; read it and click **Yes**.
 - **Command:**
@@ -181,7 +181,7 @@ mkcert -cert-file certs/localhost.pem -key-file certs/localhost-key.pem localhos
 
 - **Expected:** `The certificate is at "certs/localhost.pem" …`, valid until 7 Feb 2029. Both files are git-ignored.
 
-### E-3 Create the server app certificate ⏳ `LOCAL CHANGE` `SECURITY-SENSITIVE`
+### E-3 Create the server app certificate ✅ `LOCAL CHANGE` `SECURITY-SENSITIVE`
 
 ```bash
 mkcert -cert-file certs/fs-webrtc.pem -key-file certs/fs-webrtc-key.pem 192.168.1.133 freeswitch.mylab.com
@@ -193,7 +193,7 @@ mkcert -cert-file certs/fs-webrtc.pem -key-file certs/fs-webrtc-key.pem 192.168.
   ```
   The output must include `IP Address:192.168.1.133`.
 
-### E-4 Copy the server certificate to the server ⏳ `SERVER CHANGE` `SECURITY-SENSITIVE` `APPROVAL REQUIRED`
+### E-4 Copy the server certificate to the server ✅ `SERVER CHANGE` `SECURITY-SENSITIVE` `APPROVAL REQUIRED`
 
 - **What it does:** copies the certificate and **its** private key (never the CA key) over SSH, then locks down ownership and permissions.
 
@@ -211,7 +211,7 @@ chown -R fswebrtc:fswebrtc /opt/freeswitch-ui/fs-webrtc-certs && chmod 700 /opt/
 - **Renewal (~every 27 months):** repeat E-3 and E-4, then `systemctl restart fs-webrtc`.
 - **Rollback:** `rm /opt/freeswitch-ui/fs-webrtc-certs/fs-webrtc*.pem`.
 
-### E-5 Trust the root CA on the second PC (192.168.1.56) ⏳ `LOCAL CHANGE (other PC)` `SECURITY-SENSITIVE`
+### E-5 Trust the root CA on the second PC (192.168.1.56) ✅ `LOCAL CHANGE (other PC)` `SECURITY-SENSITIVE`
 
 - Copy **only** `rootCA.pem` (the public part) from `mkcert -CAROOT` to the second PC.
 - Double-click it → Install Certificate → Local Machine → "Trusted Root Certification Authorities".
@@ -237,7 +237,7 @@ Run on the server as root. None of these commands change anything.
 
 ---
 
-## Part G – Lab extension creation ⏳ `FREESWITCH CHANGE` `SECURITY-SENSITIVE` `APPROVAL REQUIRED`
+## Part G – Lab extension creation ✅ `FREESWITCH CHANGE` `SECURITY-SENSITIVE` `APPROVAL REQUIRED`
 
 ### G-1 Pre-checks `SAFE`
 
@@ -304,6 +304,90 @@ rm /opt/freeswitch/etc/freeswitch/directory/default/webrtc_lab_799000*.xml /opt/
 
 ---
 
+## Part G2 – Allow WebRTC audio candidates from the LAN ✅ `FREESWITCH CHANGE` `APPROVAL REQUIRED`
+
+- **Objective:** let FreeSWITCH send and receive browser (WebRTC) audio to LAN addresses.
+- **Why it is needed (found in M2, 2026-11-07):** without it, a call rings and is answered, then the browser immediately shows "Remote party hung up". The FreeSWITCH log shows:
+  ```
+  NO candidate ACL defined, Defaulting to wan.auto
+  no suitable candidates found.
+  Hangup ... [INCOMPATIBLE_DESTINATION]
+  ```
+  `wan.auto` accepts only public internet addresses, so every LAN address the browser offers is rejected.
+- **What it does:** adds one parameter to the **existing** internal profile so that ICE candidates inside the server's own LAN (`localnet.auto` = 192.168.1.0/24) are accepted. Ordinary SIP phones don't use ICE and are unaffected.
+- **Where:** the server, as root.
+- **Changes:** FreeSWITCH (edits an existing file, restarts one profile). **Needs explicit approval.**
+
+### G2-1 Safety gates and backup
+
+```bash
+/opt/freeswitch/bin/fs_cli -x "show channels count"
+```
+
+It must say `0 total.`. Then check for pending edits:
+
+```bash
+find /opt/freeswitch/etc/freeswitch -type f -newer /opt/freeswitch/var/log/freeswitch/freeswitch.xml.fsxml
+```
+
+It must print nothing. Then confirm the setting isn't already there:
+
+```bash
+grep -n apply-candidate-acl /opt/freeswitch/etc/freeswitch/sip_profiles/internal.xml
+```
+
+It must print nothing. Then make a timestamped backup:
+
+```bash
+cp -p /opt/freeswitch/etc/freeswitch/sip_profiles/internal.xml /opt/freeswitch/etc/freeswitch/sip_profiles/internal.xml.bak-$(date +%Y%m%d-%H%M%S)
+```
+
+The backup name doesn't end in `.xml`, so FreeSWITCH never loads it. (Lab backup: `internal.xml.bak-20261107-104229`.)
+
+### G2-2 Add the line directly after `local-network-acl`
+
+```bash
+sed -i 's|^\(\s*\)<param name="local-network-acl" value="localnet.auto"/>|&\n\1<param name="apply-candidate-acl" value="localnet.auto"/>|' /opt/freeswitch/etc/freeswitch/sip_profiles/internal.xml
+```
+
+- **Check:** `diff <backup> internal.xml` shows only the added line (plus the comment, in the lab).
+- **Validate:** `python3 -c "import xml.dom.minidom as m; m.parse('/opt/freeswitch/etc/freeswitch/sip_profiles/internal.xml'); print('XML OK')"`
+- **Never** add the comment text `X-PRE-PROCESS` anywhere in FreeSWITCH XML (see the lesson learned in Part G).
+
+### G2-3 Activate
+
+```bash
+/opt/freeswitch/bin/fs_cli -x "sofia profile internal restart"
+```
+
+- **Expected:** `Reload XML [Success]` then `restarting: internal`.
+- **Effect:** calls and registrations on the internal profile drop for a few seconds and devices re-register by themselves. Other profiles (Tailscale, external) and gateways are not touched.
+
+### G2-4 Verify
+
+| Check          | Command                                                                                      | Expected                                                            |
+| -------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Profiles       | `fs_cli -x "sofia status"`                                                                   | 4 profiles RUNNING                                                  |
+| Setting loaded | `grep -a 'apply-candidate-acl' /opt/freeswitch/var/log/freeswitch/freeswitch.log \| tail -1` | `apply-candidate-acl [localnet.auto]`                               |
+| Existing users | `fs_cli -x "sofia status profile internal-tailscale reg"`                                    | 1001 still registered                                               |
+| Browsers       | `fs_cli -x "sofia status profile internal reg"`                                              | 7990001/7990002 `Registered(WS-NAT)` again                          |
+| Call           | browser dials 9196                                                                           | you hear yourself; the log no longer shows "no suitable candidates" |
+
+### G2-5 Rollback
+
+```bash
+cp -p /opt/freeswitch/etc/freeswitch/sip_profiles/internal.xml.bak-20261107-104229 /opt/freeswitch/etc/freeswitch/sip_profiles/internal.xml && /opt/freeswitch/bin/fs_cli -x "sofia profile internal restart"
+```
+
+### Common errors
+
+| Error                                       | Meaning / fix                                                                                                      |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Still "no suitable candidates"              | the browser is on a different subnet (e.g. VPN or Tailscale). Use `rfc1918.auto` or a custom ACL list.             |
+| Browser offers only `xxxx.local` candidates | Chrome hides LAN IPs until microphone permission is granted. The app asks for the microphone at sign-in; allow it. |
+
+---
+
 ## Part H – WSS setup (Option A: same-origin proxy) — concept
 
 - The browser connects to `wss://192.168.1.133:8443/sip`. TLS uses the mkcert certificate (E-3).
@@ -319,13 +403,13 @@ rm /opt/freeswitch/etc/freeswitch/directory/default/webrtc_lab_799000*.xml /opt/
 
 ---
 
-## Part I – HTTPS setup on the server ⏳ `SERVER CHANGE` `APPROVAL REQUIRED`
+## Part I – HTTPS setup on the server ✅ `SERVER CHANGE` `APPROVAL REQUIRED`
 
 See Part N (deployment): the same service provides both HTTPS and WSS.
 
 ---
 
-## Part J – Firewall ⏳ `SERVER CHANGE` `SECURITY-SENSITIVE` `APPROVAL REQUIRED`
+## Part J – Firewall ✅ `SERVER CHANGE` `SECURITY-SENSITIVE` `APPROVAL REQUIRED`
 
 - **Why:** the server drops all incoming traffic unless a rule allows it. Port 8443 is not open today.
 - **Look first (`SAFE`):**
@@ -396,7 +480,7 @@ These follow `docs/TESTING.md`. Start with the echo test (dial 9196): if you hea
 
 ---
 
-## Part N – Deployment ⏳ `SERVER CHANGE` `APPROVAL REQUIRED`
+## Part N – Deployment ✅ `SERVER CHANGE` `APPROVAL REQUIRED`
 
 Full details are in `docs/DEPLOYMENT.md`. Summary:
 

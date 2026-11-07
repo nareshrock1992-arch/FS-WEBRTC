@@ -25,6 +25,9 @@
 | S-05 | REGISTER through the fixed proxy, wrong password                                      | PASS 403 Forbidden                                                        |
 | S-06 | FreeSWITCH health after changes                                                       | PASS: 4 profiles RUNNING, 1001 registered, 0 channels                     |
 
+| S-07 | First real browser call 7990001 → 7990002 (PC .56 = Firefox) | **FAIL**: answered then "Remote party hung up". FS: `no suitable candidates found`, `INCOMPATIBLE_DESTINATION` (candidate ACL defaulted to `wan.auto`) |
+| S-08 | After change C-09 (`apply-candidate-acl=localnet.auto`, internal profile restart) | profiles RUNNING 4/4; 1001 unaffected; both browsers re-registered automatically (real proof of reconnect) – call retest pending |
+
 **Not yet tested** (needs M2 server setup and real browsers): everything below. **Nothing below has been claimed as working.**
 
 ## Manual browser tests (M2/M3) – template

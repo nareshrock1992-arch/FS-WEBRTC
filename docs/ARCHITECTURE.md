@@ -33,6 +33,10 @@ FreeSWITCH reads its WSS certificate only from `wss.pem`. The existing one has n
 
 SIP.js writes `Via: SIP/2.0/WSS …` because the browser uses `wss://`. FreeSWITCH's SIP stack **silently discards** requests whose Via says WSS when they arrive on its plain `ws` listener. A byte-for-byte proxy therefore never gets a reply to REGISTER. `server/server.mjs` relays individual WebSocket messages and `server/sip-via.mjs` rewrites only the Via transport token: `WSS→WS` towards FreeSWITCH, and `WS→WSS` back on the browser's own `*.invalid` Via in replies. SDP bodies are never touched.
 
+### Deviation from "zero FreeSWITCH config change" (approved 2026-11-07)
+
+Option A avoided all FreeSWITCH _TLS_ changes. But WebRTC media also needs the internal profile to **accept LAN ICE candidates**. Without `apply-candidate-acl`, FreeSWITCH defaults to `wan.auto` and rejects private addresses, so calls failed with `INCOMPATIBLE_DESTINATION`. One line was added to `internal.xml` with explicit approval (register C-09). This applies to any FreeSWITCH that serves WebRTC browsers on a private network, so it would also have been needed with Option B.
+
 ## Call flows
 
 **Registration:** browser → `REGISTER` over WSS → proxy → FreeSWITCH replies `401` (digest challenge) → SIP.js re-sends with Authorization → `200 OK`. SIP.js refreshes it before the 300 s expiry.

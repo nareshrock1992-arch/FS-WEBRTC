@@ -7,8 +7,11 @@
 - **Proxy: REGISTER got no reply.** FreeSWITCH silently drops SIP requests whose `Via` transport is `WSS` when they arrive on its plain WS listener (verified: raw pipe gave no reply; the same REGISTER with `Via: SIP/2.0/WS` gave `200 OK`). The proxy is now WebSocket-message aware (`ws` 8.22.1) and rewrites only Via transports (`server/sip-via.mjs`); bodies/SDP are untouched.
 - `freeswitch/webrtc_lab.xml`: removed a quoted pre-process directive from an XML comment. FreeSWITCH executes those even inside comments, which caused a harmless `Error including dialplan/dialplan/*.xml` at reloadxml.
 
+- **Calls answered then dropped ("Remote party hung up").** FreeSWITCH rejected all LAN ICE candidates (`NO candidate ACL defined, Defaulting to wan.auto` → `no suitable candidates found` → `INCOMPATIBLE_DESTINATION`). Approved server change C-09: `apply-candidate-acl=localnet.auto` added to `sip_profiles/internal.xml` (backup kept), internal profile restarted. Documented in guide Part G2, `docs/FREESWITCH_LAB_CONFIG.md`, `docs/SERVER_CHANGE_REGISTER.md`.
+
 ### Added
 
+- `docs/SERVER_CHANGE_REGISTER.md`: every server change with approval, verification and rollback.
 - `scripts/register-test.mjs`: headless SIP.js REGISTER check (password from the `SIP_PASSWORD` env var).
 - Unit tests for the Via rewrite (71 tests total).
 
