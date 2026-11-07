@@ -1,0 +1,35 @@
+# systemd unit TEMPLATE for the FS-WebRTC lab server (M2 – SERVER CHANGE, APPROVAL REQUIRED).
+# Install as /etc/systemd/system/fs-webrtc.service only after approval.
+# Runs as a dedicated unprivileged user; touches nothing else on the server.
+
+[Unit]
+Description=FS-WebRTC lab softphone (HTTPS + WSS proxy to FreeSWITCH WS)
+After=network-online.target freeswitch.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fswebrtc
+Group=fswebrtc
+WorkingDirectory=/opt/freeswitch-ui/fs-webrtc
+Environment=FSW_BIND=192.168.1.133
+Environment=FSW_PORT=8443
+Environment=FSW_TLS_CERT=/opt/freeswitch-ui/fs-webrtc-certs/fs-webrtc.pem
+Environment=FSW_TLS_KEY=/opt/freeswitch-ui/fs-webrtc-certs/fs-webrtc-key.pem
+Environment=FSW_STATIC_DIR=/opt/freeswitch-ui/fs-webrtc/dist
+Environment=FSW_SIP_WS_UPSTREAM=ws://192.168.1.133:5066
+ExecStart=/usr/bin/node /opt/freeswitch-ui/fs-webrtc/server/server.mjs
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/freeswitch-ui/fs-webrtc /opt/freeswitch-ui/fs-webrtc-certs
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

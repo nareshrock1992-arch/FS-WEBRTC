@@ -1,0 +1,25 @@
+<!--
+  FS-WebRTC lab user TEMPLATE (M2 – FREESWITCH CHANGE, APPROVAL REQUIRED).
+
+  Install as:  /opt/freeswitch/etc/freeswitch/directory/default/webrtc_lab_<EXT>.xml
+  Replace:     __EXT__        e.g. 7990001
+               __PASSWORD__   lab password (typed on the server ONLY; never commit it)
+
+  - user_context "webrtc_lab" confines the account to the isolated lab dialplan
+    (no PSTN trunk, queues, IVRs or real extensions).
+  - Does NOT use $${default_password}.
+-->
+<include>
+  <user id="__EXT__">
+    <params>
+      <param name="password" value="__PASSWORD__"/>
+    </params>
+    <variables>
+      <variable name="user_context" value="webrtc_lab"/>
+      <variable name="effective_caller_id_name" value="WebRTC Lab __EXT__"/>
+      <variable name="effective_caller_id_number" value="__EXT__"/>
+      <variable name="accountcode" value="webrtc_lab"/>
+      <variable name="toll_allow" value=""/>
+    </variables>
+  </user>
+</include>

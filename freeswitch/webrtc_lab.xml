@@ -1,0 +1,49 @@
+<!--
+  FS-WebRTC isolated lab dialplan context (M2 – FREESWITCH CHANGE, APPROVAL REQUIRED).
+  Install as: /opt/freeswitch/etc/freeswitch/dialplan/webrtc_lab.xml
+  (picked up by the existing  <X-PRE-PROCESS cmd="include" data="dialplan/*.xml"/>)
+
+  Lab users (user_context=webrtc_lab) can ONLY:
+    - call each other (7990001 / 7990002)
+    - call 9196 (echo test: you hear yourself – proves two-way media path)
+    - call 9197 (DTMF test: plays back the digits you press)
+  Everything else is refused. No existing context is modified.
+-->
+<include>
+  <context name="webrtc_lab">
+
+    <extension name="webrtc_lab_users">
+      <condition field="destination_number" expression="^(7990001|7990002)$">
+        <action application="set" data="call_timeout=30"/>
+        <action application="set" data="hangup_after_bridge=true"/>
+        <action application="bridge" data="user/$1@${domain_name}"/>
+      </condition>
+    </extension>
+
+    <extension name="webrtc_lab_echo">
+      <condition field="destination_number" expression="^9196$">
+        <action application="answer"/>
+        <action application="echo"/>
+      </condition>
+    </extension>
+
+    <extension name="webrtc_lab_dtmf_test">
+      <condition field="destination_number" expression="^9197$">
+        <action application="answer"/>
+        <action application="sleep" data="500"/>
+        <action application="read" data="1 10 tone_stream://%(200,0,800) lab_digits 10000 #"/>
+        <action application="log" data="NOTICE webrtc_lab DTMF received: ${lab_digits}"/>
+        <action application="say" data="en number iterated ${lab_digits}"/>
+        <action application="hangup"/>
+      </condition>
+    </extension>
+
+    <extension name="webrtc_lab_deny_everything_else">
+      <condition field="destination_number" expression="^.*$">
+        <action application="log" data="WARNING webrtc_lab refused destination ${destination_number}"/>
+        <action application="hangup" data="NO_ROUTE_DESTINATION"/>
+      </condition>
+    </extension>
+
+  </context>
+</include>

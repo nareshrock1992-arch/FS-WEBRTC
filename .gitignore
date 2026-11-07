@@ -1,0 +1,25 @@
+# dependencies / build output
+node_modules/
+dist/
+coverage/
+
+# local environment (may contain lab-specific values) – never commit
+.env
+.env.local
+.env.*.local
+
+# certificates and private keys – never commit
+certs/*
+!certs/README.md
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# editor / OS
+.vscode/
+.idea/
+*.log
+Thumbs.db
+.DS_Store
